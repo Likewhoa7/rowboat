@@ -10,35 +10,35 @@ from disco.types.message import MessageEmbed
 from rowboat.plugins import RowboatPlugin as Plugin, CommandFail
 from rowboat.types.plugin import PluginConfig
 from rowboat.types import ChannelField, Field, SlottedModel, ListField, DictField
-from rowboat.models.user import StarboardBlock, User
-from rowboat.models.message import StarboardEntry, Message
+from rowboat.models.user import DogboardBlock, User
+from rowboat.models.message import DogboardEntry, Message
 from rowboat.util.timing import Debounce
-from rowboat.constants import STAR_EMOJI, ERR_UNKNOWN_MESSAGE
+from rowboat.constants import DOG_EMOJI, ERR_UNKNOWN_MESSAGE
 
 
-def is_star_event(e):
-    if e.emoji.name == STAR_EMOJI:
+def is_dog_event(e):
+    if e.emoji.name == DOG_EMOJI:
         return True
 
 
 class ChannelConfig(SlottedModel):
     sources = ListField(ChannelField, default=[])
 
-    # Delete the star when the message is deleted
+    # Delete the dog when the message is deleted
     clear_on_delete = Field(bool, default=True)
 
-    # Min number of stars to post on the board
-    min_stars = Field(int, default=1)
-    min_stars_pin = Field(int, default=15)
+    # Min number of dogs to post on the board
+    min_dogs = Field(int, default=1)
+    min_dogs_pin = Field(int, default=15)
 
-    # The number which represents the "max" star level
-    star_color_max = Field(int, default=15)
+    # The number which represents the "max" dog level
+    dog_color_max = Field(int, default=15)
 
-    # Prevent users from starring their own posts
-    prevent_self_star = Field(bool, default=False)
+    # Prevent users from dogging their own posts
+    prevent_self_dog = Field(bool, default=False)
 
     def get_color(self, count):
-        ratio = min(count / float(self.star_color_max), 1.0)
+        ratio = min(count / float(self.dog_color_max), 1.0)
 
         return (
             (255 << 16) +
@@ -46,44 +46,44 @@ class ChannelConfig(SlottedModel):
             int((12 * ratio) + (247 * (1 - ratio))))
 
 
-class StarboardConfig(PluginConfig):
+class DogboardConfig(PluginConfig):
     channels = DictField(ChannelField, ChannelConfig)
 
-    # TODO: validate that each source channel has only one starboard mapping
+    # TODO: validate that each source channel has only one dogboard mapping
 
     def get_board(self, channel_id):
-        # Starboards can't work recursively
+        # Dogboards can't work recursively
         if channel_id in self.channels:
             return (None, None)
 
-        for starboard, config in self.channels.items():
+        for dogboard, config in self.channels.items():
             if not config.sources or channel_id in config.sources:
-                return (starboard, config)
+                return (dogboard, config)
         return (None, None)
 
 
-@Plugin.with_config(StarboardConfig)
-class StarboardPlugin(Plugin):
+@Plugin.with_config(DogboardConfig)
+class DogboardPlugin(Plugin):
     def load(self, ctx):
-        super(StarboardPlugin, self).load(ctx)
+        super(DogboardPlugin, self).load(ctx)
         self.updates = {}
         self.locks = {}
 
-    @Plugin.command('show', '<mid:snowflake>', group='stars', level=CommandLevels.TRUSTED)
-    def stars_show(self, event, mid):
+    @Plugin.command('show', '<mid:snowflake>', group='dogs', level=CommandLevels.TRUSTED)
+    def dogs_show(self, event, mid):
         try:
-            star = StarboardEntry.select().join(Message).where(
+            dog = DogboardEntry.select().join(Message).where(
                 (Message.guild_id == event.guild.id) &
-                (~(StarboardEntry.star_message_id >> None)) &
+                (~(DogboardEntry.dog_message_id >> None)) &
                 (
                     (Message.id == mid) |
-                    (StarboardEntry.star_message_id == mid)
+                    (DogboardEntry.dog_message_id == mid)
                 )
             ).get()
-        except StarboardEntry.DoesNotExist:
-            raise CommandFail('no starboard message with that id')
+        except DogboardEntry.DoesNotExist:
+            raise CommandFail('no dogboard message with that id')
 
-        _, sb_config = event.config.get_board(star.message.channel_id)
+        _, sb_config = event.config.get_board(dog.message.channel_id)
 
         try:
             source_msg = self.client.api.channels_messages_get(
